@@ -8,13 +8,13 @@ def parse_numeric(s):
         else:
             if a[-1]: a.append(str())
     if not a[-1]: a.pop(-1)
-    return list(map(int, a))
+    return tuple(map(int, a))
 
 
 class ASTBlock:
     def __init__(self):
         self.stype = str()
-        self.addr = [-1, -1]
+        self.addr = (-1, -1)
         self.parent = None
 
     def parse(self, s):
@@ -98,7 +98,7 @@ class ASTree:
         return self.blocks[addr]
 
     def _add_block(self, b):
-        self.blocks[tuple(b.addr)] = b
+        self.blocks[b.addr] = b
     
     def add_root(self, n):
         self.root = n
@@ -110,10 +110,13 @@ class ASTree:
         for c in v.children: self._add_subtree(c)
 
     def parse_file(self, fn):
-        f = open(fn)
+        with open(fn) as f:
+            self.parse_lines(f.readlines())
+
+    def parse_lines(self, lines):
         self.root = ASTNode()
         hierarchy = [self.root]
-        for l in f.readlines():
+        for l in lines:
             level, pl = prepare_line(l)
             b = parse_line(hierarchy[level], pl)
             self._add_block(b)
@@ -123,3 +126,29 @@ class ASTree:
                 else:
                     hierarchy.append(b)
         self.root = self.root[0]
+
+class ASTDiff:
+    def __init__(self, src=None, dest=None):
+        self.a = src
+        self.b = dest
+        self.matches = list()
+        self.actions = list()
+
+    def load_json_file(self, fn):
+        import json
+        with open(fn) as f:
+            d = json.loads(f.read())
+            self.load_matches(d["matches"])
+            self.load_actions(d["actions"])
+
+    def load_matches(self, match_list):
+        parse_addr = lambda s: parse_numeric(s.split(" ")[-1])
+        for m in match_list:
+            am_addr = parse_addr(m["src"])
+            bm_addr = parse_addr(m["dest"])
+            self.a[am_addr], self.b[bm_addr] # check
+            self.matches.append((am_addr, bm_addr))
+
+    def load_actions(self, action_list):
+        for a in action_list:
+            self.actions.append(a)
