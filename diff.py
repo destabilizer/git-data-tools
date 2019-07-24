@@ -100,8 +100,8 @@ def name_of(node):
     return next(filter(lambda f: f.stype == 'SimpleName', node.fields)).text
 
 
-def in_which(ad, node):
-     return next(filter(lambda n: in_address(node.addr, n[0])), ad)[1]
+def in_which(addr_list, addr):
+     return next(filter(lambda a: in_address(addr, a), addr_list))
 
 
 class ASTree:
@@ -150,10 +150,10 @@ class ASTree:
         self.root = self.root[0]
     
     def in_which_class(self, node):
-        return in_which(self.classes, node)
+        return self.blocks[in_which(self.classes.keys(), node.addr)]
 
     def in_which_method(self, node):
-        return in_which(self.methods, node)
+        return self.blocks[in_which(self.methods.keys(), node.addr)]
 
 
 class ASTDiff:
@@ -192,7 +192,37 @@ class ASTDiff:
         return next(filter(lambda m: m[0] == src_a, self.matches))[1]
     
     def dest2src(self, dest_a):
-        return next(filter(lambda m: m[1] == src_a, self.matches))[0]
+        return next(filter(lambda m: m[1] == dest_a, self.matches))[0]
+        
+    def new_methods(self):
+        ml = list()
+        for ma, m in self.b.methods.items():
+            try:
+                self.dest2src(ma)
+            except StopIteration:
+                ml.append(m)
+        return ml
+    
+    def removed_methods(self):
+        ml = list()
+        for ma, m in self.a.methods.items():
+            try:
+                self.src2dest(ma)
+            except StopIteration:
+                ml.append(m)
+        return ml
+    
+    def updated_methods(self):
+        ml = list()
+        for a in self.actions:
+            if a.stype == 'update-node':
+                for ma, m in self.a.methods.items():
+                    if m in ml: continue
+                    if address_in(a.addr, ma): ml.append(m)
+        return ml
+    
+    def actions_in_block(self, b):
+        return filter(lambda a: address_in(a.addr, b.addr), self.actions)
 
 
 class DiffAction:
