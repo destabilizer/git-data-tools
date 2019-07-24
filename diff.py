@@ -39,6 +39,7 @@ class ASTNode(ASTBlock):
         super().__init__()
         self.children = list()
         self.fields = list()
+        self.name = ''
 
     def add_child(self, n):
         n.set_parent(self)
@@ -53,8 +54,15 @@ class ASTNode(ASTBlock):
 
     def __repr__(self):
         s = super().__repr__()
-        return s + " ({0} children, {1} fields)".format(len(self.children),
-                                                          len(self.fields))
+        if not self.name:
+            try:
+                self.name = name_of(self)
+            except:
+                pass
+        return s + " `{0}` ({1} children, {2} fields)".format(self.name, 
+                                                              len(self.children), 
+                                                              len(self.fields))
+
 
 class ASTField(ASTBlock):
     def __init__(self):
