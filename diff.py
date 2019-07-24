@@ -1,3 +1,4 @@
+import os
 indent = "    "
 
 def parse_numeric(s):
@@ -40,9 +41,11 @@ class ASTNode(ASTBlock):
         self.fields = list()
 
     def add_child(self, n):
+        n.set_parent(self)
         self.children.append(n)
 
     def add_field(self, f):
+        f.set_parent(self)
         self.fields.append(f)
 
     def __getitem__(self, i):
@@ -89,16 +92,35 @@ def parse_line(parent, l):
         return n
 
 
+def address_in(child_a, parent_a):
+    return (child_a[0] >= parent_a[0]) and (child_a[1] <= parent_a[1])
+
+
+def name_of(node):
+    return next(filter(lambda f: f.stype == 'SimpleName', node.fields)).text
+
+
+def in_which(ad, node):
+     return next(filter(lambda n: in_address(node.addr, n[0])), ad)[1]
+
+
 class ASTree:
     def __init__(self):
         self.blocks = dict()
         self.root = None
+        self.classes = dict()
+        self.methods = dict()
 
     def __getitem__(self, addr):
         return self.blocks[addr]
 
     def _add_block(self, b):
         self.blocks[b.addr] = b
+        if b.stype == 'TYPE_DECLARATION_KIND':
+            if b.text == 'class':
+                self.classes[b.parent.addr] = b.parent
+        if b.stype == 'MethodDeclaration':
+            self.methods[b.addr] = b
     
     def add_root(self, n):
         self.root = n
@@ -110,7 +132,7 @@ class ASTree:
         for c in v.children: self._add_subtree(c)
 
     def parse_file(self, fn):
-        with open(fn) as f:
+        with open(os.path.expanduser(fn)) as f:
             self.parse_lines(f.readlines())
 
     def parse_lines(self, lines):
@@ -126,6 +148,13 @@ class ASTree:
                 else:
                     hierarchy.append(b)
         self.root = self.root[0]
+    
+    def in_which_class(self, node):
+        return in_which(self.classes, node)
+
+    def in_which_method(self, node):
+        return in_which(self.methods, node)
+
 
 class ASTDiff:
     def __init__(self, src=None, dest=None):
@@ -136,10 +165,16 @@ class ASTDiff:
 
     def load_json_file(self, fn):
         import json
-        with open(fn) as f:
+        with open(os.path.expanduser(fn)) as f:
             d = json.loads(f.read())
             self.load_matches(d["matches"])
             self.load_actions(d["actions"])
+
+    def load_all_files(self, a_fn, b_fn, diff_fn):
+        self.a, self.b = ASTree(), ASTree()
+        self.a.parse_file(a_fn)
+        self.b.parse_file(b_fn)
+        self.load_json_file(diff_fn)
 
     def load_matches(self, match_list):
         parse_addr = lambda s: parse_numeric(s.split(" ")[-1])
@@ -151,4 +186,20 @@ class ASTDiff:
 
     def load_actions(self, action_list):
         for a in action_list:
-            self.actions.append(a)
+            self.actions.append(DiffAction(a))
+    
+    def src2dest(self, src_a):
+        return next(filter(lambda m: m[0] == src_a, self.matches))[1]
+    
+    def dest2src(self, dest_a):
+        return next(filter(lambda m: m[1] == src_a, self.matches))[0]
+
+
+class DiffAction:
+    def __init__(self, data):
+        self.raw = data
+        self.stype = data['action']
+        self.addr = parse_numeric(data['tree'].split(' ')[-1])
+    
+    def __repr__(self):
+        return self.stype + " " + str(self.addr)
