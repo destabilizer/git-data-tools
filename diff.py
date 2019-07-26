@@ -20,7 +20,7 @@ class ASTBlock:
 
     def parse(self, s):
         w = s.split(" ")
-        print(w) # shows that everything is ok
+        # print(w) # shows that everything is ok
         self.stype = w[0].strip(":")
         self.addr = parse_numeric(w[-1])
 
@@ -193,41 +193,55 @@ class ASTDiff:
             self.matches.append((am_addr, bm_addr))
 
     def load_actions(self, action_list):
+        update_node_pt = 0
         for a in action_list:
-            self.actions.append(DiffAction(a))
+            da = DiffAction(a)
+            # special presorting -- 'update-node' must be first
+            if da.stype == 'update-node':
+                self.actions.insert(update_node_pt, da)
+                update_node_pt += 1
+            else:
+                self.actions.append(da)
+        self.process_actions()
     
     def src2dest(self, src_a):
         return next(filter(lambda m: m[0] == src_a, self.matches))[1]
     
     def dest2src(self, dest_a):
         return next(filter(lambda m: m[1] == dest_a, self.matches))[0]
-        
-    def new_methods(self):
-        ml = list()
-        for ma, m in self.b.methods.items():
-            try:
-                self.dest2src(ma)
-            except StopIteration:
-                ml.append(m)
-        return ml
-    
-    def removed_methods(self):
-        ml = list()
-        for ma, m in self.a.methods.items():
-            try:
-                self.src2dest(ma)
-            except StopIteration:
-                ml.append(m)
-        return ml
-    
-    def updated_methods(self):
-        ml = list()
+            
+    def process_actions(self):
+        # here also must be clasess
+        self.removed_methods = dict()
+        self.new_methods = dict()
+        self.updated_methods = dict()
+        self.moved_blocks = list()
+
+        rawbug = "{0}: gumtree bug, method {1} is already marked as updated"
+        bug = lambda a, addr: rawbug.format(a.stype, name_of(self.updated_methods[addr]))
+
         for a in self.actions:
             if a.stype == 'update-node':
                 for ma, m in self.a.methods.items():
-                    if m in ml: continue
-                    if address_in(a.addr, ma): ml.append(m)
-        return ml
+                    if ma in self.updated_methods.keys(): continue
+                    if address_in(a.addr, ma): self.updated_methods[ma] = m
+            elif a.stype == 'insert-node':
+                # print('insert node!', self.b[a.addr])
+                if a.addr in map(self.src2dest, self.updated_methods.keys()):
+                    # print(bug(a, self.dest2src(a.addr)))
+                    continue
+                if a.addr not in self.b.methods.keys(): continue
+                m = self.b.methods[a.addr]
+                self.new_methods[m.addr] = m
+            elif a.stype == 'delete-node':
+                if a.addr in self.updated_methods.keys():
+                    # print(bug(a, a.addr))
+                    continue
+                if a.addr not in self.a.methods.keys(): continue
+                m = self.a.methods[a.addr]
+                self.removed_methods[m.addr] = m
+            elif a.stype == 'move-tree':
+                self.moved_blocks.append(a.addr)
     
     def actions_in_block(self, b):
         return filter(lambda a: address_in(a.addr, b.addr), self.actions)
