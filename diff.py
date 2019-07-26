@@ -82,8 +82,20 @@ class ASTField(ASTBlock):
 
 
 def prepare_line(l):
-    indent_level = len(l.split(indent))-1
-    pure_line = l.lstrip(" ").strip("\n")
+    indent_level = 0
+    pure_line = ''
+    is_identation = True
+    for i in range(len(l)):
+        if is_identation:
+            t = i%len(indent)
+            if l[i] == indent[t]:
+                if t+1 == len(indent): indent_level += 1
+            else:
+                pure_line += l[i]
+                is_identation = False
+        else:
+            if l[i] == '\n': break
+            pure_line += l[i]
     return (indent_level, pure_line)
 
 
@@ -140,6 +152,7 @@ class ASTree:
         for c in v.children: self._add_subtree(c)
 
     def parse_file(self, fn):
+        self.fn = fn
         with open(os.path.expanduser(fn)) as f:
             self.parse_lines(f.readlines())
 
@@ -148,6 +161,13 @@ class ASTree:
         hierarchy = [self.root]
         for l in lines:
             level, pl = prepare_line(l)
+            try:
+                hierarchy[level]
+            except IndexError:
+                print(hierarchy)
+                print(level)
+                print('THIS LINE:', l)
+                print('THIS FILE:', self.fn)
             b = parse_line(hierarchy[level], pl)
             self._add_block(b)
             if type(b) == ASTNode:
