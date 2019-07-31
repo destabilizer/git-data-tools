@@ -46,10 +46,13 @@ def process_logline(logline, outpath, r):
     
     r.update(matches)
 
-def find_methods_in_commit_message(commit_message, astdiff):
+zipname = lambda n: ''.join(map(lambda w: w[0], n.split('_')))
+
+def find_code_mentions_in_commit_message(commit_message, astdiff):
     names = lambda md: map(diff.name_of, md.values())
-    all_names = dict(map(lambda a: [a[0], names(getattr(astdiff, a))],
-                         ['new_methods', 'removed_methods', 'updated_methods']))
+    all_names = dict(map(lambda a: [zipname(a), names(getattr(astdiff, a))],
+                         ['updated_classes', 'new_methods', 
+                          'removed_methods', 'updated_methods']))
     matches = dict([[m, dict()] for m in all_names.keys()])
     for marker, method_names in all_names.items():
         for mn in method_names:
@@ -62,6 +65,12 @@ def process_messages_linear(logfile, outpath, outfile):
         for logline in log.readlines():
             if skip_diff(logline, outpath): continue
             process_logline(logline, outpath)
+
+ def check_result(r):
+        for md in r.values():
+            for ml in md.values():
+                if ml: return True
+        return False
 
 def process_messages_threaded(logfile, outpath, matchfile, allmatchfile):
     from data_threading import ThreadedDataManager
@@ -76,12 +85,6 @@ def process_messages_threaded(logfile, outpath, matchfile, allmatchfile):
     log.readline()
     tdm.set_data(log.readlines())
     tdm.start()
-    
-    def check_result(r):
-        for md in r.values():
-            for ml in md.values():
-                if ml: return True
-        return False
     
     while not tdm.is_finished():
         time.sleep(20)
