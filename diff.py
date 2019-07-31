@@ -121,7 +121,10 @@ def name_of(node):
 
 
 def in_which(addr_list, addr):
-     return next(filter(lambda a: in_address(addr, a), addr_list))
+    try:
+        return next(filter(lambda a: address_in(addr, a), addr_list))
+    except StopIteration:
+        return
 
 
 class ASTree:
@@ -155,6 +158,9 @@ class ASTree:
         self.fn = fn
         with open(os.path.expanduser(fn)) as f:
             self.parse_lines(f.readlines())
+    
+    def parse_txt(self, txt):
+        self.parse_lines(txt.split('\n'))
 
     def parse_lines(self, lines):
         self.root = ASTNode()
@@ -236,6 +242,7 @@ class ASTDiff:
         self.new_methods = dict()
         self.updated_methods = dict()
         self.moved_blocks = list()
+        self.updated_classes = dict()
 
         rawbug = "{0}: gumtree bug, method {1} is already marked as updated"
         bug = lambda a, addr: rawbug.format(a.stype, name_of(self.updated_methods[addr]))
@@ -245,6 +252,8 @@ class ASTDiff:
                 for ma, m in self.a.methods.items():
                     if ma in self.updated_methods.keys(): continue
                     if address_in(a.addr, ma): self.updated_methods[ma] = m
+                    c = in_which(self.a.classes.keys(), a.addr)
+                    if c: self.updated_classes[c] = self.a[c]
             elif a.stype == 'insert-node':
                 # print('insert node!', self.b[a.addr])
                 if a.addr in map(self.src2dest, self.updated_methods.keys()):
@@ -253,6 +262,8 @@ class ASTDiff:
                 if a.addr not in self.b.methods.keys(): continue
                 m = self.b.methods[a.addr]
                 self.new_methods[m.addr] = m
+                c = in_which(self.b.classes.keys(), a.addr)
+                if c: self.updated_classes[c] = self.b[c]
             elif a.stype == 'delete-node':
                 if a.addr in self.updated_methods.keys():
                     # print(bug(a, a.addr))
@@ -260,6 +271,8 @@ class ASTDiff:
                 if a.addr not in self.a.methods.keys(): continue
                 m = self.a.methods[a.addr]
                 self.removed_methods[m.addr] = m
+                c = in_which(self.a.classes.keys(), a.addr)
+                if c: self.updated_classes[c] = self.a[c]
             elif a.stype == 'move-tree':
                 self.moved_blocks.append(a.addr)
     
