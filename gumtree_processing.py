@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-from ecoprocessings.data_threading import ThreadedDataManager
+from data_threading import ThreadedDataManager
 
 suff = lambda s: s + ".java"
 
@@ -30,16 +30,16 @@ def threaded_processing(gumtreebin, logfile, blobspath, outpath,
     tdm.start()
 
 def skip_diff(logline, outpath):
-    l = logline.split("; ")
+    l = logline.split(";")
     commit_hash = l[0]
     blobnames = l[4:6]
     status = l[2]
     filename = l[3]
     outfile = os.path.join(outpath,
                            "{0}-{1}-{2}.json".format(commit_hash, *blobnames))
-    if os.path.exists(outfile):
-        print("Skipping, already processed")
-        return True
+    #if os.path.exists(outfile):
+    #    print("Skipping, already processed")
+    #    return True
     if status != "M":
         print("Skipping, bad type")
         return True
@@ -49,7 +49,7 @@ def skip_diff(logline, outpath):
     return False
     
 def proceed_diff(logline, gumtreebin, blobspath, outpath):
-        l = logline.split("; ")
+        l = logline.split(";")
         commit_hash = l[0]
         blobnames = l[4:6]
         status = l[2]
@@ -84,7 +84,28 @@ def proceed_diff(logline, gumtreebin, blobspath, outpath):
         #subprocess.run(frmt("{0} cluster {1} {2} > {3}.cluster"), shell=True)
         print("processed")
 
+def process_diff(gumtreebin, blobspath, blobnames, outpath):
+    bn = list(blobnames)
+    gumbin = os.path.expanduser(gumtreebin)
+    op = os.path.join(outpath, '')
+    bp = os.path.join(blobspath, '')
+    parse_cmd = "{0} parse {1}{3}"
+    parse_fn = "{2}{3}.ast"
+    diff_cmd = "{0} jsondiff {1}{3} {1}{4}"
+    diff_fn = "{2}{3}-{4}-diff.json"
+    filenames = list()
+    for n in bn:
+        pc = parse_cmd.format(gumbin, op, bp, n)
+        pf = parse_fn.format(gumbin, op, bp, n)
+        subprocess.run(pc + " > " + pf, shell=True)
+        filenames.append(pf)
+    dc = diff_cmd.format(gumbin, op, bp, *bn)
+    df = diff_fn.format(gumbin, op, bp, *bn)
+    subprocess.run(dc + " > " + df, shell=True)
+    filenames.append(df)
+    return filenames
+
 if __name__ == "__main__":
-    args = ("~/gumtree-2.1.3-SNAPSHOT/bin/gumtree", "~/gcm_aurora_full.log", "~/aurora_blobs", "~/aurora_diff_new")
+    args = ("~/gumtree-2.1.3-SNAPSHOT/bin/gumtree", "~/gcm_intellij_full.log", "~/intellij_blobs", "~/intellij_diff")
     args_with_corrected_path = map(os.path.expanduser, args)
     threaded_processing(*args_with_corrected_path)

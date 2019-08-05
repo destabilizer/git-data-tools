@@ -66,11 +66,18 @@ def process_messages_linear(logfile, outpath, outfile):
             if skip_diff(logline, outpath): continue
             process_logline(logline, outpath)
 
- def check_result(r):
-        for md in r.values():
-            for ml in md.values():
-                if ml: return True
-        return False
+def check_result(r):
+    for md in r.values():
+        for ml in md.values():
+            if ml: return True
+    return False
+
+def clean_message(msg):
+    l = msg.split('\n')
+    if  l[-1].startswith('GitOrigin-RevId'):
+        return ' '.join(l[:-1])
+    else:
+        return ' '.join(l)
 
 def process_messages_threaded(logfile, outpath, matchfile, allmatchfile):
     from data_threading import ThreadedDataManager
