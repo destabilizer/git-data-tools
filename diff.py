@@ -119,6 +119,8 @@ def address_in(child_a, parent_a):
 def name_of(node):
     return next(filter(lambda f: f.stype == 'SimpleName', node.fields)).text
 
+def name_of_method(node):
+    return name_of(node.parent_class)+'.'+name_of(node)
 
 def in_which(addr_list, addr):
     try:
@@ -144,6 +146,7 @@ class ASTree:
                 self.classes[b.parent.addr] = b.parent
         if b.stype == 'MethodDeclaration':
             self.methods[b.addr] = b
+            b.parent_class = self.classes[in_which(self.classes.keys(), b.addr)]
     
     def add_root(self, n):
         self.root = n
@@ -155,7 +158,6 @@ class ASTree:
         for c in v.children: self._add_subtree(c)
 
     def parse_file(self, fn):
-        self.fn = fn
         with open(os.path.expanduser(fn)) as f:
             self.parse_lines(f.readlines())
     
@@ -167,13 +169,6 @@ class ASTree:
         hierarchy = [self.root]
         for l in lines:
             level, pl = prepare_line(l)
-            try:
-                hierarchy[level]
-            except IndexError:
-                print(hierarchy)
-                print(level)
-                print('THIS LINE:', l)
-                print('THIS FILE:', self.fn)
             b = parse_line(hierarchy[level], pl)
             self._add_block(b)
             if type(b) == ASTNode:
@@ -276,10 +271,18 @@ class ASTDiff:
             elif a.stype == 'move-tree':
                 self.moved_blocks.append(a.addr)
                 
-        # now moving removed and created methods with same name to category of updated_methods
-        namesd = lambda d: {name_of(m):a for a, m in d.items()}
+        # full names of methods
+        namesd = lambda d: {name_of_method(m):a for a, m in d.items()}
         new_names = namesd(self.new_methods)
         rmv_names = namesd(self.removed_methods)
+        upd_names = namesd(self.updated_methods)
+        # delete methods from new or removed if they are already in updated_methods
+        for um in upd_names.keys():
+            if um in new_names.keys():
+                self.new_methods.pop(new_names[um].addr)
+            if um in rmv_names.keys():
+                self.removed_methods.pop(rmv_names[um].addr)
+        # now moving new and removed methods with same name to category of updated_methods
         matched_names = set(new_names.keys()).intersection(set(rmv_names.keys()))
         for mn in matched_names:
             addr_b = new_names[mn]
@@ -287,6 +290,7 @@ class ASTDiff:
             self.new_methods.pop(addr_b)
             m = self.removed_methods.pop(addr_a)
             self.updated_methods[addr_a] = m
+    
     
     def actions_in_block(self, b):
         return filter(lambda a: address_in(a.addr, b.addr), self.actions)
