@@ -279,9 +279,9 @@ class ASTDiff:
         # delete methods from new or removed if they are already in updated_methods
         for um in upd_names.keys():
             if um in new_names.keys():
-                self.new_methods.pop(new_names[um].addr)
+                self.new_methods.pop(new_names[um])
             if um in rmv_names.keys():
-                self.removed_methods.pop(rmv_names[um].addr)
+                self.removed_methods.pop(rmv_names[um])
         # now moving new and removed methods with same name to category of updated_methods
         matched_names = set(new_names.keys()).intersection(set(rmv_names.keys()))
         for mn in matched_names:

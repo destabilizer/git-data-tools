@@ -7,25 +7,62 @@ from gumtree_processing import skip_diff
 
 import os
 
-getnames = lambda d: list(map(diff.name_of, d.values()))
+cf = lambda s: s[0].upper()+s[1:] if s else s
 
-_s = lambda a: 's' if len(a) > 1 else ''
-cm = lambda a: ', '.join(a)
+def new_methods_msg(method_list):
+    if len(method_list) == 1:
+        return 'added new method ' + method_list[0]
+    elif len(method_list) < 4:
+        return 'added new methods ' + ', '.join(method_list)
+    else:
+        return 'a lot of new methods added'
+
+def updated_methods_msg(method_list):
+    if len(method_list) == 1:
+        return 'changed method ' + method_list[0]
+    elif len(method_list) < 4:
+        return 'some changes in methods ' + ', '.join(method_list)
+    else:
+        return 'massive update'
+
+def removed_methods_msg(method_list):
+    if len(method_list) == 1:
+        return 'deleted method ' + method_list[0]
+    elif len(method_list) < 4:
+        return 'methods ' + ', '.join(method_list) + ' had been removed'
+    else:
+        return 'cleanup'
+
+def tree_on_methodlist(method_list):
+    t = dict()
+    for m in method_list:
+        parname = diff.name_of(m.parent_class)
+        if parname not in t.keys():
+            t[parname] = [diff.name_of(m)]
+        else:
+            t[parname].append(diff.name_of(m))
+    return t
+
+def generate_msg_on_tree(msgfunc, method_tree):
+    totalmsg = list()
+    for cn, ml in method_tree.items():
+        msg = msgfunc(ml) + ' in class ' + cn
+        totalmsg.append(msg)
+    return '; '.join(totalmsg)
+
+def generate_msg_on_ml(msgfunc, method_list):
+    return generate_msg_on_tree(msgfunc, tree_on_methodlist(method_list))
+
+def generate_msg_on_funcname(astdiff, funcname):
+    msgfunc = globals()[funcname+'_msg']
+    method_list = getattr(astdiff, funcname).values()
+    return generate_msg_on_ml(msgfunc, method_list)
 
 def naive_msg(astdiff):
-    #updc = getnames(astdiff.updated_classes)
-    newm = getnames(astdiff.new_methods)
-    rmvm = getnames(astdiff.removed_methods)
-    updm = getnames(astdiff.updated_methods)
     msg = list()
-    if newm:
-        msg.append('added new method' + _s(newm) + ' ' + cm(newm))
-    if updm:
-        msg.append('some changes in method' + _s(updm) + ' ' + cm(updm)) 
-    if rmvm:
-        msg.append('removed method' + _s(rmvm) + ' ' + cm(rmvm))
-    return '; '.join(msg).capitalize()
-
+    for fn in ['new_methods', 'updated_methods', 'removed_methods']:
+        msg.append(generate_msg_on_funcname(astdiff, fn))
+    return '[' + '; '.join(filter(lambda s: s, msg)) + ']'
 
 def linear_process(logfile, outfile, astpath):
     log = open(logfile)
@@ -63,5 +100,5 @@ def main(logfile, outfile, astpath):
 
 if __name__ == '__main__':
     main('~/gcm_aurora_full.log',
-         '~/aurora_naive.log',
+         '~/aurora_naive_fullnames.log',
          '~/aurora_diff_new/')
