@@ -9,10 +9,16 @@ suff = lambda s: s + ".java"
 def linear_processing(gumtreebin, logfile, blobspath, outpath):
     log = open(logfile)
     log.readline() # skipping first
+    allc = 0
+    truc = 0
     while True:
+        print(allc, '/', truc)
         line = log.readline()
         if not line: break
-        proceed_diff(line, gumtreebin, blobspath, outpath)
+        allc += 1
+        if skip_diff(line, outpath): continue
+        truc += 1
+        #proceed_diff(line, gumtreebin, blobspath, outpath)
 
 def threaded_processing(gumtreebin, logfile, blobspath, outpath,
                         thread_amount=16):
@@ -29,27 +35,27 @@ def threaded_processing(gumtreebin, logfile, blobspath, outpath,
     tdm.setData(log.readlines())
     tdm.start()
 
-def skip_diff(logline, outpath):
-    l = logline.split(";")
+def skip_diff(logline):
+    l = logline.split("; ")
     commit_hash = l[0]
     blobnames = l[4:6]
     status = l[2]
     filename = l[3]
-    outfile = os.path.join(outpath,
-                           "{0}-{1}-{2}.json".format(commit_hash, *blobnames))
+    #outfile = os.path.join(outpath,
+    #                       "{0}-{1}-{2}.json".format(commit_hash, *blobnames))
     #if os.path.exists(outfile):
     #    print("Skipping, already processed")
     #    return True
     if status != "M":
-        print("Skipping, bad type")
+        #print("Skipping, bad type")
         return True
     if not filename.endswith(suff("")):
-        print("Skipping, not a java source file")
+        #print("Skipping, not a java source file")
         return True
     return False
     
 def proceed_diff(logline, gumtreebin, blobspath, outpath):
-        l = logline.split(";")
+        l = logline.split("; ")
         commit_hash = l[0]
         blobnames = l[4:6]
         status = l[2]
@@ -106,6 +112,6 @@ def process_diff(gumtreebin, blobspath, blobnames, outpath):
     return filenames
 
 if __name__ == "__main__":
-    args = ("~/gumtree-2.1.3-SNAPSHOT/bin/gumtree", "~/gcm_intellij_full.log", "~/intellij_blobs", "~/intellij_diff")
+    args = ("~/gumtree-2.1.3-SNAPSHOT/bin/gumtree", "~/gcm_aurora_full.log", "~/intellij_blobs", "~/intellij_diff")
     args_with_corrected_path = map(os.path.expanduser, args)
-    threaded_processing(*args_with_corrected_path)
+    linear_processing(*args_with_corrected_path)

@@ -275,6 +275,18 @@ class ASTDiff:
                 if c: self.updated_classes[c] = self.a[c]
             elif a.stype == 'move-tree':
                 self.moved_blocks.append(a.addr)
+                
+        # now moving removed and created methods with same name to category of updated_methods
+        namesd = lambda d: {name_of(m):a for a, m in d.items()}
+        new_names = namesd(self.new_methods)
+        rmv_names = namesd(self.removed_methods)
+        matched_names = set(new_names.keys()).intersection(set(rmv_names.keys()))
+        for mn in matched_names:
+            addr_b = new_names[mn]
+            addr_a = rmv_names[mn]
+            self.new_methods.pop(addr_b)
+            m = self.removed_methods.pop(addr_a)
+            self.updated_methods[addr_a] = m
     
     def actions_in_block(self, b):
         return filter(lambda a: address_in(a.addr, b.addr), self.actions)

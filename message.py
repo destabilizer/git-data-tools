@@ -107,6 +107,7 @@ def process_messages_threaded(logfile, outpath, matchfile, allmatchfile):
                 matchf.write(outstring)
         matchf.close()
         allmatchf.close()
+
     
 if __name__ == '__main__':
     #print(sorted(match_word_in_text("meow", "woof meow woof meww")))

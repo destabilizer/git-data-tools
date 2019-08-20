@@ -12,11 +12,15 @@ def process_git_repo(repo_path, skip, depth, gumtreebin, tmpdir, logfilepath):
     commits = r.iter_commits('master', max_count=depth)
     for i in range(skip+1): ac = next(commits)
     log = open(os.path.expanduser(logfilepath), 'w')
+    commit_counter = 0
+    matched_commits = 0
     for bc in commits:
         commit_message = ac.message
         cln_msg = message.clean_message(commit_message)
         diffs = ac.diff(bc)
-        print('<== Processing commit with message:\n', commit_message)
+        print('\n<== Processing commit with message:\n', commit_message)
+        commit_counter += 1
+        anymatch = False
         for d in diffs:
             if skip_diff(d): continue
             a, b, df = run_gumtree(d, gumtreebin, tmpdir)
@@ -25,10 +29,13 @@ def process_git_repo(repo_path, skip, depth, gumtreebin, tmpdir, logfilepath):
             m = message.find_code_mentions_in_commit_message(cln_msg, astdiff)
             print(m)
             if message.check_result(m):
+                anymatch = True
                 m['msg'] = cln_msg
                 log.write(str(m)+',\n')
                 log.flush()
         print('==>\n')
+        matched_commits += anymatch
+        print('[{0}/{1}]'.format(matched_commits, commit_counter))
         # print('1st message')
         # print(ac.message)
         # print('2st message')
@@ -60,7 +67,7 @@ def skip_diff(d):
         return False
 
 if __name__ == '__main__':
-    process_git_repo('~/intellij-community', 500, 1000, 
+    process_git_repo('~/intellij-community', 0, 1000, 
                      "~/gumtree-2.1.3-SNAPSHOT/bin/gumtree",
                      "~/tmp/",
                      "~/matches.json")
