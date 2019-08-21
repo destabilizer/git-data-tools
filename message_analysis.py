@@ -2,20 +2,26 @@ import json
 
 from message import match_word_in_text
 
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
 
-def word_split(txt):
-    txtl = txt.lower()
-    words = list()
+
+lemmatizer = WordNetLemmatizer()
+stopWords = set(stopwords.words('english'))
+
+
+def code_tokenize(txt):
+    tokens = list()
     cur_word = str()
-    for t in txtl:
-        if t.isalpha():
+    for t in txt:
+        if t.isupper() or not t.isalpha():
+            if cur_word: tokens.append(cur_word)
+            cur_word = t.lower() if t.isalpha() else str()
+        else:
             cur_word += t
-        elif cur_word:
-            words.append(cur_word)
-            cur_word = str()
     else:
-        if cur_word: words.append(cur_word)
-    return words
+        if cur_word: tokens.append(cur_word)
+    return tokens
 
 
 def glue(seq_of_lists):
@@ -24,9 +30,11 @@ def glue(seq_of_lists):
     return g
 
 
+clean_tl = lambda tl: set(map(lemmatizer.lemmatize, glue(map(code_tokenize, tl))))
+
 def token_diff(atl, btl):
-    a = set(glue(map(word_split, atl)))
-    b = set(glue(map(word_split, btl)))
+    a = clean_tl(atl)
+    b = clean_tl(btl)
     return [a.difference(b), b.difference(a)]
 
 # json block
@@ -58,12 +66,21 @@ def search_for_category(wordcat, commitlist):
         if matches: matched.append(c)
     return matched
 
+def check_word(w):
+    if len(w) <= 1:
+        return False
+    elif w in stopWords:
+        return False
+    else:
+        return True
+
 def wordfreq_in_texts(textslist):
     freq = dict()
     for txt in textslist:
         added = list()
-        words = word_split(txt)
+        words = code_tokenize(txt)
         for w in words:
+            if not check_word(w): continue
             if w in added: continue
             if w in freq.keys():
                 freq[w] += 1
@@ -90,7 +107,10 @@ def wordfreq_of_messages(commitlist):
 token_amount = lambda c: len(c['deletedWordTokens'])+len(c['addedWordTokens'])
 
 def small_changes(commitlist, measure):
-    return list(filter(lambda c: token_amount(c) < measure, commitlist))
+    return list(filter(lambda c: token_amount(c) <= measure, commitlist))
+
+def big_changes(commitlist, measure):
+    return list(filter(lambda c: token_amount(c) > measure, commitlist))
 
 def print_freq(freqlist):
     for f, w in freqlist:
