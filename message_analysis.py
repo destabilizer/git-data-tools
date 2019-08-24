@@ -5,6 +5,8 @@ from message import match_word_in_text
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 
+from bisect import insort
+
 
 lemmatizer = WordNetLemmatizer()
 stopWords = set(stopwords.words('english'))
@@ -116,3 +118,52 @@ def print_freq(freqlist):
     for f, w in freqlist:
         print(w, str(round(f*100, 2))+'%')
 
+def is_commit_small(c):
+    return len(c['addedWordTokens']) < 6 and len(c['deletedWordTokens']) < 6
+
+def find_related_features(freq1, freq2, coeff=2):
+    dfreq1 = dict(map(reversed, freq1))
+    dfreq2 = dict(map(reversed, freq2))
+    all_words = set(dfreq1.keys()).union(set(dfreq2.keys()))
+    feat1, feat2 = list(), list()
+    for w in all_words:
+        w_f1 = dfreq1[w] if w in dfreq1.keys() else 0
+        w_f2 = dfreq2[w] if w in dfreq2.keys() else 0
+        if w_f1 > coeff*w_f2: insort(feat1, (w_f1, w_f2, w))
+        if w_f2 > coeff*w_f1: insort(feat2, (w_f2, w_f1, w))
+    feat1.reverse()
+    feat2.reverse()
+    return feat1, feat2
+
+def print_features(feat_freq):
+    for f1, f2, feat in feat_freq:
+        f_perc = str(round(f1*100, 2))
+        if f2 <= 0:
+            c = 'inf'
+        else:
+            c = str(round(f1/f2, 2))
+        print(f_perc+'%', feat, '['+c+']')
+
+def categories_from_text(feattext):
+    categories = dict()
+    startNewCat = True
+    for l in feattext.split('\n'):
+        word = l.strip(' \n')
+        if word:
+            if startNewCat:
+                curcat = word
+                categories[curcat] = list()
+                startNewCat = False
+            categories[curcat].append(word)
+        else:
+            startNewCat = True
+    return categories
+
+def split_with_and_no_message(commitlist):
+    withmsg, nomsg = list(), list()
+    for c in commitlist:
+        if c['message'] == '(no message)':
+            nomsg.append(c)
+        else:
+            withmsg.append(c)
+    return withmsg, nomsg
