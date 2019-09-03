@@ -1,4 +1,7 @@
 import os
+
+import rename_analysis
+
 indent = "    "
 
 def parse_numeric(s):
@@ -142,8 +145,8 @@ class ASTree:
     def _add_block(self, b):
         self.blocks[b.addr] = b
         if b.stype == 'TYPE_DECLARATION_KIND':
-            if b.text == 'class':
-                self.classes[b.parent.addr] = b.parent
+            #if b.text == 'class':
+            self.classes[b.parent.addr] = b.parent
         if b.stype == 'MethodDeclaration':
             self.methods[b.addr] = b
             b.parent_class = self.classes[in_which(self.classes.keys(), b.addr)]
@@ -238,17 +241,24 @@ class ASTDiff:
         self.updated_methods = dict()
         self.moved_blocks = list()
         self.updated_classes = dict()
+        self.renames = dict()
 
         rawbug = "{0}: gumtree bug, method {1} is already marked as updated"
         bug = lambda a, addr: rawbug.format(a.stype, name_of(self.updated_methods[addr]))
 
+        self.size = 0
+
         for a in self.actions:
             if a.stype == 'update-node':
+                # updated methods
                 for ma, m in self.a.methods.items():
                     if ma in self.updated_methods.keys(): continue
                     if address_in(a.addr, ma): self.updated_methods[ma] = m
                     c = in_which(self.a.classes.keys(), a.addr)
                     if c: self.updated_classes[c] = self.a[c]
+                # renames
+                if a.raw["tree"].startswith("SimpleName"): # if rename
+                    self.renames[a.addr] = rename_analysis.parse_rename(a.raw)
             elif a.stype == 'insert-node':
                 # print('insert node!', self.b[a.addr])
                 if a.addr in map(self.src2dest, self.updated_methods.keys()):
@@ -270,6 +280,7 @@ class ASTDiff:
                 if c: self.updated_classes[c] = self.a[c]
             elif a.stype == 'move-tree':
                 self.moved_blocks.append(a.addr)
+            self.size += 1
                 
         # full names of methods
         namesd = lambda d: {name_of_method(m):a for a, m in d.items()}
@@ -290,7 +301,21 @@ class ASTDiff:
             self.new_methods.pop(addr_b)
             m = self.removed_methods.pop(addr_a)
             self.updated_methods[addr_a] = m
+        
+        self.method_extractions = list(map(self.b.methods.__getitem__, 
+                                      filter(lambda a: a,
+                                             map(lambda a: in_which(self.b.methods.keys(), a),
+                                                 self.moved_blocks))))
     
+    # def dump_changes(self):
+    #     d = dict()
+    #     return {k:getattr(self, k) for k in ['removed_methods',
+    #                                          'new_methods',
+    #                                          'updated_methods',
+    #                                          'moved_blocks',
+    #                                          'updated_classes',
+    #                                          'renames',
+    #                                          'size']}
     
     def actions_in_block(self, b):
         return filter(lambda a: address_in(a.addr, b.addr), self.actions)
@@ -303,4 +328,4 @@ class DiffAction:
         self.addr = parse_numeric(data['tree'].split(' ')[-1])
     
     def __repr__(self):
-        return self.stype + " " + str(self.addr)
+        return "{0} {1} \ndata:\n{2}".format(self.stype, self.addr, self.raw)

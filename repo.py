@@ -6,6 +6,7 @@ import gumtree_processing
 
 import git
 
+print_dict = lambda d: print('\n'.join(map(lambda p: '\n{0}:\n\t{1}'.format(*p), d.items())))
 
 def process_git_repo(repo_path, skip, depth, gumtreebin, tmpdir, logfilepath):
     r = git.Repo(os.path.expanduser(repo_path))
@@ -26,13 +27,14 @@ def process_git_repo(repo_path, skip, depth, gumtreebin, tmpdir, logfilepath):
             a, b, df = run_gumtree(d, gumtreebin, tmpdir)
             astdiff = diff.ASTDiff()
             astdiff.load_all_files(a, b, df)
-            m = message.find_code_mentions_in_commit_message(cln_msg, astdiff)
-            print(m)
-            if message.check_result(m):
-                anymatch = True
-                m['msg'] = cln_msg
-                log.write(str(m)+',\n')
-                log.flush()
+            #m = message.find_code_mentions_in_commit_message(cln_msg, astdiff)
+            #print(m)
+            #if message.check_result(m):
+            #    anymatch = True
+            #    m['msg'] = cln_msg
+            #    log.write(str(m)+',\n')
+            #    log.flush()
+            print_dict(astdiff.dump_changes())
         print('==>\n')
         matched_commits += anymatch
         print('[{0}/{1}]'.format(matched_commits, commit_counter))

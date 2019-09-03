@@ -7,6 +7,7 @@ from gumtree_processing import skip_diff
 
 import os
 import csv
+import json
 
 cf = lambda s: s[0].upper()+s[1:] if s else s
 
@@ -100,7 +101,8 @@ def flatcl(commit_array):
     fsm = list(map(fn_st_msg, commit_array))
     fsm.sort()
     fn = ', '.join(map(compose_fn, fsm))
-    msg = ', '.join(map(compose_msg, filter(cor_msg, fsm)))
+    #msg = ', '.join(map(compose_msg, filter(cor_msg, fsm)))
+    msg = '; '.join(map(lambda c: c[-1], commit_array))
     print(msg)
     return c[:3]+[fn, msg]
 
@@ -126,8 +128,20 @@ def process_line(line, astpath):
     except Exception as e:
         print('Some error', e)
         return parseline(line) + ['<error>']
-    msg = naive_msg(d)
+    #msg = naive_msg(d)
+    msg  = jsonmsg(d)
     return [commit_hash, author, omsg, status, filename, msg]
+
+def jsonmsg(astdiff):
+    d = dict()
+    d['cls'] = list(map(diff.name_of, astdiff.updated_classes.values()))
+    d['new'] = list(map(diff.name_of_method, astdiff.new_methods.values()))
+    d['upd'] = list(map(diff.name_of_method, astdiff.updated_methods.values()))
+    d['rmv'] = list(map(diff.name_of_method, astdiff.removed_methods.values()))
+    d['rnm'] = list(astdiff.renames.values())
+    d['ext'] = list(map(diff.name_of_method, astdiff.method_extractions))
+    d['size'] = astdiff.size
+    return json.dumps(d)
 
 def main(logfile, outfile, astpath):
     logfile = os.path.expanduser(logfile)
@@ -137,5 +151,5 @@ def main(logfile, outfile, astpath):
 
 if __name__ == '__main__':
     main('~/gcm_aurora_full.log',
-         '~/aurora_naive.csv',
+         '~/aurora_json.csv',
          '~/aurora_diff_new/')
