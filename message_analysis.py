@@ -32,12 +32,19 @@ def glue(seq_of_lists):
     return g
 
 
-clean_tl = lambda tl: set(map(lemmatizer.lemmatize, glue(map(code_tokenize, tl))))
+#clean_tl = lambda tl: set(map(lemmatizer.lemmatize, glue(map(code_tokenize, tl))))
+clean_tl = lambda tl: list(map(lemmatizer.lemmatize, glue(map(code_tokenize, tl))))
+def fast_clean(tl):
+    l = list()
+    for t in tl:
+        l += code_tokenize(t)
+    return l
 
-def token_diff(atl, btl):
+#def token_diff(atl, btl):
     a = clean_tl(atl)
     b = clean_tl(btl)
-    return [a.difference(b), b.difference(a)]
+    #return [a.difference(b), b.difference(a)]
+    return [a, b]
 
 # json block
 
@@ -45,10 +52,16 @@ def process_token_json(commit_info):
     a, b = token_diff(commit_info['deletedTokens'], commit_info['addedTokens'])
     commit_info['deletedWordTokens'] = a
     commit_info['addedWordTokens']   = b
+    commit_info['allTokens']         = a+b
+
+def fast_process_token_json(commit_info):
+    a = fast_clean(commit_info['deletedTokens'])
+    b = fast_clean(commit_info['addedTokens'])
+    commit_info['allTokens'] = a+b
 
 def process_commitlist(commitlist):
     for c in commitlist:
-        process_token_json(c)
+        fast_process_token_json(c)
 
 def load_json(filename):
     import json
@@ -106,20 +119,20 @@ def wordfreq_of_messages(commitlist):
     wfl.insert(0, (no_message, 'no message'))
     return list(map(lambda fw: (fw[0]/total, fw[1]), wfl))
 
-token_amount = lambda c: len(c['deletedWordTokens'])+len(c['addedWordTokens'])
+# token_amount = lambda c: len(c['deletedWordTokens'])+len(c['addedWordTokens'])
 
-def small_changes(commitlist, measure):
-    return list(filter(lambda c: token_amount(c) <= measure, commitlist))
+# def small_changes(commitlist, measure):
+#     return list(filter(lambda c: token_amount(c) <= measure, commitlist))
 
-def big_changes(commitlist, measure):
-    return list(filter(lambda c: token_amount(c) > measure, commitlist))
+# def big_changes(commitlist, measure):
+#     return list(filter(lambda c: token_amount(c) > measure, commitlist))
 
 def print_freq(freqlist):
     for f, w in freqlist:
         print(w, str(round(f*100, 2))+'%')
 
-def is_commit_small(c):
-    return len(c['addedWordTokens']) < 6 and len(c['deletedWordTokens']) < 6
+def is_commit_small(c, measure):
+    return len(c['allTokens']) < measure
 
 def find_related_features(freq1, freq2, coeff=2):
     dfreq1 = dict(map(reversed, freq1))
@@ -162,7 +175,7 @@ def categories_from_text(feattext):
 def split_with_and_no_message(commitlist):
     withmsg, nomsg = list(), list()
     for c in commitlist:
-        if c['message'] == '(no message)':
+        if 'no message' in c['message']:
             nomsg.append(c)
         else:
             withmsg.append(c)
